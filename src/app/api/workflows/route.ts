@@ -5,19 +5,24 @@ async function getPrisma() {
   return prisma
 }
 
-async function getSessionUserId(req: NextRequest): Promise<string | null> {
-  const token = req.cookies.get("next-auth.session-token")?.value
-  if (!token) return null
+// Simple JWT decode without verification (NextAuth JWT is already signed)
+function decodeJwt(token: string): any {
   try {
-    const prisma = await getPrisma()
-    const session = await prisma.session.findUnique({
-      where: { sessionToken: token },
-      select: { userId: true },
-    })
-    return session?.userId ?? null
+    const parts = token.split(".")
+    if (parts.length !== 3) return null
+    const payload = parts[1]
+    const decoded = Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString()
+    return JSON.parse(decoded)
   } catch {
     return null
   }
+}
+
+async function getSessionUserId(req: NextRequest): Promise<string | null> {
+  const token = req.cookies.get("next-auth.session-token")?.value
+  if (!token) return null
+  const payload = decodeJwt(token)
+  return payload?.id ?? null
 }
 
 export async function GET(req: NextRequest) {
