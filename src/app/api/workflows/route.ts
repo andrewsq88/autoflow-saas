@@ -1,35 +1,50 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/db"
 
-export async function GET() {
+async function getPrisma() {
+  const { prisma } = await import("@/lib/db")
+  return prisma
+}
+
+async function getSessionUserId(req: NextRequest): Promise<string | null> {
+  const token = req.cookies.get("next-auth.session-token")?.value
+  if (!token) return null
   try {
-    // Get all workflows for the authenticated user
-    // For MVP, return all workflows (auth check in middleware)
-    const workflows = await prisma.workflow.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 50,
+    const prisma = await getPrisma()
+    const session = await prisma.session.findUnique({
+      where: { sessionToken: token },
+      select: { userId: true },
     })
-    return NextResponse.json({ workflows })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return session?.userId ?? null
+  } catch {
+    return null
   }
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const { name, description, category } = await req.json()
-    if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 })
+export async function GET(req: NextRequest) {
+  const userId = await getSessionUserId(req)
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const prisma = await getPrisma()
+  const workflows = await prisma.workflow.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+  })
+  return NextResponse.json(workflows)
+}
 
-    const workflow = await prisma.workflow.create({
-      data: {
-        userId: "temp", // Will be replaced with actual user ID from session
-        name,
-        description,
-        category: category || "general",
-      },
-    })
-    return NextResponse.json({ workflow })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+export async function POST(req: NextRequest) {
+  const userId = await getSessionUserId(req)
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const body = await req.json()
+  const prisma = await getPrisma()
+  const workflow = await prisma.workflow.create({
+    data: {
+      userId,
+      name: body.name,
+      description: body.description,
+      category: body.category || "general",
+      trigger: body.trigger,
+      actions: body.actions,
+    },
+  })
+  return NextResponse.json(workflow, { status: 201 })
 }

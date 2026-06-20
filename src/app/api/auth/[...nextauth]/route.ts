@@ -2,7 +2,12 @@ import type { NextRequest } from "next/server"
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
-import { prisma } from "@/lib/db"
+
+// Lazy import prisma to avoid build-time DB connection
+async function getPrisma() {
+  const { prisma } = await import("@/lib/db")
+  return prisma
+}
 
 const handler = NextAuth({
   providers: [
@@ -14,6 +19,7 @@ const handler = NextAuth({
       },
       async authorize(credentials: any) {
         if (!credentials?.email || !credentials?.password) return null
+        const prisma = await getPrisma()
         const user = await prisma.user.findUnique({ where: { email: credentials.email } })
         if (!user || !user.password) return null
         const valid = await bcrypt.compare(credentials.password, user.password)
