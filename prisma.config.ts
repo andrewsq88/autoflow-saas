@@ -7,6 +7,6 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: "file:/home/node/autoflow-saas/dev.db",
+    url: process.env.DATABASE_URL,
   },
 })

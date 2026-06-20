@@ -30,8 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+.env.local
+.env.*.local
 
 # vercel
 .vercel
@@ -40,11 +42,21 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# prisma generated
 /src/generated/prisma
 
-# database
-dev.db
+# database - never commit DB files
 *.db
+*.sqlite
+*.sqlite3
+prisma/dev.db
 
 # lock files
 package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# AI agent config files
+AGENTS.md
+CLAUDE.md
+.cursorrules
