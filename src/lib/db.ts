@@ -1,25 +1,27 @@
-import { PrismaClient } from "@prisma/client"
+// Prisma client singleton with lazy initialization
+// Avoids connection issues during Next.js build time
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
+import type { PrismaClient as PrismaClientType } from "@prisma/client"
+
+const PrismaClientConstructor = (): typeof import("@prisma/client").PrismaClient => {
+  return require("@prisma/client").PrismaClient
 }
 
-function createPrismaClient() {
-  try {
-    return new PrismaClient()
-  } catch {
-    // Return a proxy that will retry on first actual use
-    return new Proxy({} as PrismaClient, {
-      get(_, prop) {
-        return (...args: any[]) => {
-          const client = globalForPrisma.prisma || new PrismaClient()
-          return (client as any)[prop](...args)
-        }
-      },
-    })
-  }
-}
+// Use a proxy to lazy-load the Prisma client only when actually used
+const prismaClient = (() => {
+  let client: PrismaClientType | null = null
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient()
+  return new Proxy({} as PrismaClientType, {
+    get(_target, prop) {
+      if (!client) {
+        const PC = PrismaClientConstructor()
+        client = process.env.NODE_ENV === "production"
+          ? new PC()
+          : (globalThis as any).__prisma ??= new PC()
+      }
+      return (client as any)[prop]
+    },
+  })
+})()
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
+export { prismaClient as prisma }
